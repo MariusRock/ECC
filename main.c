@@ -1,7 +1,12 @@
 #include <stdio.h>
 #include <gmp.h>
 
+#include <string.h> // for strlen
+
 #define init_values {\
+  mpz_init(k);\
+  mpz_init(Gx);\
+  mpz_init(Gy);\
   mpz_init(a);\
   mpz_init(b);\
   mpz_init(x);\
@@ -16,6 +21,9 @@
 }
 
 #define clear_values {\
+  mpz_clear(k);\
+  mpz_clear(Gx);\
+  mpz_clear(Gy);\
   mpz_clear(a);\
   mpz_clear(b);\
   mpz_clear(x);\
@@ -32,6 +40,8 @@
 
 mpz_t x,x2,y,y2;   // two points (x,y)
 mpz_t a,b,n;       // Elliptic Curve y²=x³+ax+b mod n
+mpz_t Gx,Gy;       // start point on curve
+mpz_t k;           // private key
 
 // Temporal Variables
 mpz_t xo,yo;       // x_old and y_old , which are temporal copies of x and y
@@ -52,18 +62,35 @@ void Evaluate_function(mpz_t result,const mpz_t input_x){
 
 
 
+
 void point_addition(mpz_t x,mpz_t y,mpz_t x2,mpz_t y2){
 
-  printf("(x1,y1)=(%lu,%lu) and (x2,y2)=(%lu,%lu) -> ",mpz_get_ui(x),mpz_get_ui(y),mpz_get_ui(x2),mpz_get_ui(y2));
+  if (mpz_cmp_ui(x, 0UL) == 0 && mpz_cmp_ui(y, 0UL) == 0){
+    mpz_set(x,x2);
+    mpz_set(y,y2);
+    return;
+  }
+
+	if (mpz_cmp_ui(x2, 0UL) == 0 && mpz_cmp_ui(y2, 0UL) == 0)
+  return;
+
+  //printf("(x1,y1)=(%lu,%lu) and (x2,y2)=(%lu,%lu) -> ",mpz_get_ui(x),mpz_get_ui(y),mpz_get_ui(x2),mpz_get_ui(y2));
+  if (mpz_cmp(x,x2) == 0){
+    mpz_set_ui(x,0UL);
+    mpz_set_ui(y,0UL);
+    return;
+  }
 
   mpz_sub(xo,x,x2);
   mpz_sub(yo,y,y2);
-  mpz_cdiv_qr(tmp_exp,r,yo,xo); // tmp_exp = (y-y2)/(x-x2)
+
+  mpz_invert(tmp_exp,xo,n);
+  mpz_mul(tmp_exp,tmp_exp,yo);  // tmp_exp = ( (y-y2) * (x-x2)⁻¹ )
+  mpz_mod(tmp_exp,tmp_exp,n);
 
   mpz_set(xo,x);
   mpz_set(yo,y);
 
-  if(mpz_get_ui(r)!=0) printf("! ! ! Remainder in point addition unequal zero ! ! ! \n");
   mpz_mul(r,tmp_exp,tmp_exp);
   mpz_add(yo,x,x2);
   mpz_sub(x,r,yo);               // x_new = tmp_exp²-(x+x2)
@@ -72,14 +99,13 @@ void point_addition(mpz_t x,mpz_t y,mpz_t x2,mpz_t y2){
   mpz_sub(r,x2,x);
   mpz_mod(r,r,n); // spped enhancement due to calculation iwth small postive numbers
 
-
-
   mpz_mul(tmp_exp,tmp_exp,r);
   mpz_sub(tmp_exp,tmp_exp,y2);                // y_new = tmp_exp * (x-x_new) - y
   mpz_mod(y,tmp_exp,n);
 }
 
 void point_doubling(mpz_t x,mpz_t y){ // x=[(3x²+a)/(2y)]² - 2 x
+
   mpz_set(xo,x);
   mpz_set(yo,y);
   mpz_mul(tmp_exp,x,x);            // x²
@@ -100,6 +126,31 @@ void point_doubling(mpz_t x,mpz_t y){ // x=[(3x²+a)/(2y)]² - 2 x
   mpz_mod(y,y,n);                  // y_new = s * (x_old-x_new)-y_old
 }
 
+
+void scalar_multiplication(mpz_t x,mpz_t y,mpz_t k){
+
+  mpz_set(Gx,x);
+  mpz_set(Gy,y);
+  mpz_set_ui(x,0);
+  mpz_set_ui(y,0);
+
+  char *val_str = mpz_get_str(NULL, 2, k);
+  size_t len = strlen(val_str);
+  for (int i = len - 1; i >= 0; i--) {
+    printf("Char: %c \n", val_str[i] );
+  if (val_str[i] == '1'){
+    //printf("LOOP_ADD_G = (%lu,%lu) \n",mpz_get_ui(Gx),mpz_get_ui(Gy));
+    //printf("LOOP_ADD_P = (%lu,%lu) \n",mpz_get_ui(x),mpz_get_ui(y));
+    point_addition(x,y,Gx,Gy);
+    printf("LOOP_ADD_point = (%lu,%lu) \n",mpz_get_ui(x),mpz_get_ui(y));
+  }
+  if(k==0) continue;
+  point_doubling(x,y);
+  printf("LOOP_DOU_point = (%lu,%lu) \n",mpz_get_ui(x),mpz_get_ui(y));
+  }
+
+}
+
 int main()
 {
   printf("limb size: %i bit \n",mp_bits_per_limb);  // A limb means the part of a multi-precision number that fits in a single machine word. Normally a limb is 32 or 64 bits.
@@ -110,6 +161,7 @@ int main()
   mpz_init_set_str (a, "2", 10);
   mpz_init_set_str (n, "17", 10);
 	mpz_set_ui(b,2);
+  mpz_set_ui(k,9);
 
   mpz_init_set_str (x, "5", 10);
 
@@ -125,21 +177,28 @@ int main()
 	y_ui = mpz_get_ui (y); // cast back to unsigned int
 	printf("point= (%lu,%lu) \n",x_ui,y_ui);
 
+/*  gg grrg
   point_doubling(x,y);
 
   x_ui = mpz_get_ui (x); // cast back to unsigned int
   y_ui = mpz_get_ui (y); // cast back to unsigned int
 	printf("point= (%lu,%lu) \n",x_ui,y_ui);
 
-  for(int i=0;i!=5;i++)
+
+  for(int i=0;i!=20;i++)
     {
     point_addition(x,y,x2,y2);
     //point_doubling(x,y);
 
     x_ui = mpz_get_ui (x); // cast back to unsigned int
     y_ui = mpz_get_ui (y); // cast back to unsigned int
-	   printf("point= (%lu,%lu) \n",x_ui,y_ui);
+	   printf("point %d = (%lu,%lu) \n",i,x_ui,y_ui);
    }
+
+   */
+
+   scalar_multiplication(x,y,k);
+   printf("point %lu G= (%lu,%lu) \n",mpz_get_ui(k),mpz_get_ui(x),mpz_get_ui(y));
 
 
   clear_values
