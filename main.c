@@ -10,9 +10,7 @@
   mpz_init(a);\
   mpz_init(b);\
   mpz_init(x);\
-  mpz_init(x2);\
   mpz_init(y);\
-  mpz_init(y2);\
   mpz_init(xo);\
   mpz_init(yo);\
   mpz_init(tmp_exp);\
@@ -27,9 +25,7 @@
   mpz_clear(a);\
   mpz_clear(b);\
   mpz_clear(x);\
-  mpz_clear(x2);\
   mpz_clear(y);\
-  mpz_clear(y2);\
   mpz_clear(xo);\
   mpz_clear(yo);\
   mpz_clear(tmp_exp);\
@@ -38,18 +34,15 @@
 }
 
 
-mpz_t x,x2,y,y2;   // two points (x,y)
+mpz_t x,y;         // point (x,y)
 mpz_t a,b,n;       // Elliptic Curve y²=x³+ax+b mod n
 mpz_t Gx,Gy;       // start point on curve
 mpz_t k;           // private key
 
 // Temporal Variables
-mpz_t xo,yo;       // x_old and y_old , which are temporal copies of x and y
+mpz_t xo,yo;       // x_old and y_old , which are temporal copies of x and y (used in Addition and Doubling)
 mpz_t tmp_exp,r;   // genereal temporal expression (try not to avoid where possible)
 
-// Class of Functions
-// 1. Functions for signed integer arithmetic, with names beginning with  mpz_
-// 4. Fast low-level functions that operate on natural numbers begin with mpn_
 
 void Evaluate_function(mpz_t result,const mpz_t input_x){
   mpz_mul(result,a,x);
@@ -58,10 +51,6 @@ void Evaluate_function(mpz_t result,const mpz_t input_x){
   mpz_add(result,result,b);
   mpz_mod(result,result,n);
 }
-
-
-
-
 
 void point_addition(mpz_t x,mpz_t y,mpz_t x2,mpz_t y2){
 
@@ -78,6 +67,7 @@ void point_addition(mpz_t x,mpz_t y,mpz_t x2,mpz_t y2){
   if (mpz_cmp(x,x2) == 0){
     mpz_set_ui(x,0UL);
     mpz_set_ui(y,0UL);
+    printf("Warning, addition with same x coordinate ");
     return;
   }
 
@@ -105,7 +95,6 @@ void point_addition(mpz_t x,mpz_t y,mpz_t x2,mpz_t y2){
 }
 
 void point_doubling(mpz_t x,mpz_t y){ // x=[(3x²+a)/(2y)]² - 2 x
-
   mpz_set(xo,x);
   mpz_set(yo,y);
   mpz_mul(tmp_exp,x,x);            // x²
@@ -113,7 +102,7 @@ void point_doubling(mpz_t x,mpz_t y){ // x=[(3x²+a)/(2y)]² - 2 x
   mpz_add(tmp_exp,tmp_exp,a);      //3x²+a
   mpz_mul_2exp(y,yo,1);            // ## NOTE: y will be used as a tmp var here
   mpz_invert(y,y,n);               // ## (2y)⁻¹
-  if(mpz_get_ui(y)==0) printf("Error, inverse doesn't exist \n"); // Check might be neglected
+  if(mpz_get_ui(y)==0) printf("Warning, inverse doesn't exist "); // Check might be neglected
   mpz_mul(tmp_exp,tmp_exp,y);      // ##
   mpz_mod(tmp_exp,tmp_exp,n);      // s=[(3x²+a)/(2y)]
   mpz_mul(x,tmp_exp,tmp_exp);      // x=s²
@@ -131,24 +120,19 @@ void scalar_multiplication(mpz_t x,mpz_t y,mpz_t k){
 
   mpz_set(Gx,x);
   mpz_set(Gy,y);
-  mpz_set_ui(x,0);
-  mpz_set_ui(y,0);
 
   char *val_str = mpz_get_str(NULL, 2, k);
+  //printf("String: %s\n",val_str);
   size_t len = strlen(val_str);
-  for (int i = len - 1; i >= 0; i--) {
-    printf("Char: %c \n", val_str[i] );
-  if (val_str[i] == '1'){
-    //printf("LOOP_ADD_G = (%lu,%lu) \n",mpz_get_ui(Gx),mpz_get_ui(Gy));
-    //printf("LOOP_ADD_P = (%lu,%lu) \n",mpz_get_ui(x),mpz_get_ui(y));
+  for (int i = 1; i != len;i++)  {
+  //printf("Char: %c in round %d\n", val_str[i],i );
+  point_doubling(x,y); // This leads to Doubling of point infinity in first round, which is uncritical
+  //printf("LOOP_DOU_point = (%lu,%lu) \n",mpz_get_ui(x),mpz_get_ui(y));
+   if (val_str[i] == '1'){
     point_addition(x,y,Gx,Gy);
-    printf("LOOP_ADD_point = (%lu,%lu) \n",mpz_get_ui(x),mpz_get_ui(y));
+    //printf("LOOP_ADD_point = (%lu,%lu) \n",mpz_get_ui(x),mpz_get_ui(y));
   }
-  if(k==0) continue;
-  point_doubling(x,y);
-  printf("LOOP_DOU_point = (%lu,%lu) \n",mpz_get_ui(x),mpz_get_ui(y));
   }
-
 }
 
 int main()
@@ -158,51 +142,52 @@ int main()
 
   init_values // init values and sets values to zero
 
-  mpz_init_set_str (a, "2", 10);
-  mpz_init_set_str (n, "17", 10);
+  mpz_set_ui(n,17);
+  mpz_set_ui(a,2);
 	mpz_set_ui(b,2);
-  mpz_set_ui(k,9);
+  mpz_set_ui(k,97);
 
   mpz_init_set_str (x, "5", 10);
-
   Evaluate_function(y,x); // y=f(x)=x
 
-  mpz_set(x2,x);
-  mpz_set(y2,y);
+	printf("point G = (%lu,%lu) \n",mpz_get_ui (x),mpz_get_ui (y));
 
 
-  unsigned long int y_ui,x_ui;
-
-  x_ui = mpz_get_ui (x); // cast back to unsigned int
-	y_ui = mpz_get_ui (y); // cast back to unsigned int
-	printf("point= (%lu,%lu) \n",x_ui,y_ui);
-
-/*  gg grrg
+/*
+// Example to list
+  mpz_set(Gx,x);
+  mpz_set(Gy,y);
   point_doubling(x,y);
+  for(int i=0;i!=20;i++){
+    point_addition(x,y,Gx,Gy);
+    printf("point %d G = (%lu,%lu) \n",i+3,mpz_get_ui(x),mpz_get_ui(y));
+  }
+*/
 
-  x_ui = mpz_get_ui (x); // cast back to unsigned int
-  y_ui = mpz_get_ui (y); // cast back to unsigned int
-	printf("point= (%lu,%lu) \n",x_ui,y_ui);
 
 
-  for(int i=0;i!=20;i++)
-    {
-    point_addition(x,y,x2,y2);
-    //point_doubling(x,y);
+/*
+// for manuel tests
+// z.b. right now 24=(1*2+1)*2*2*2
+  mpz_set(Gx,x);
+  mpz_set(Gy,y);
+point_doubling(x,y);point_addition(x,y,Gx,Gy);
+point_doubling(x,y);point_doubling(x,y);
+point_doubling(x,y);
+printf("point G = (%lu,%lu) \n",mpz_get_ui(x),mpz_get_ui(y));
+*/
 
-    x_ui = mpz_get_ui (x); // cast back to unsigned int
-    y_ui = mpz_get_ui (y); // cast back to unsigned int
-	   printf("point %d = (%lu,%lu) \n",i,x_ui,y_ui);
-   }
 
-   */
-
-   scalar_multiplication(x,y,k);
-   printf("point %lu G= (%lu,%lu) \n",mpz_get_ui(k),mpz_get_ui(x),mpz_get_ui(y));
+  for(int i=2;i!=25;i++){
+    mpz_set_ui(k,i);
+    mpz_init_set_str (x, "5", 10);
+    Evaluate_function(y,x); // y=f(x)=x
+  scalar_multiplication(x,y,k);
+  printf("point %lu G = (%lu,%lu) \n",mpz_get_ui(k),mpz_get_ui(x),mpz_get_ui(y));
+  }
 
 
   clear_values
 
   return 0;
-
 }
