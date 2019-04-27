@@ -33,7 +33,6 @@
   mpz_init(r);\
 }
 
-
 mpz_t x,y;         // point (x,y)
 mpz_t a,b,n;       // Elliptic Curve y²=x³+ax+b mod n
 mpz_t Gx,Gy;       // start point on curve
@@ -63,7 +62,6 @@ void point_addition(mpz_t x,mpz_t y,mpz_t x2,mpz_t y2){
 	if (mpz_cmp_ui(x2, 0UL) == 0 && mpz_cmp_ui(y2, 0UL) == 0)
   return;
 
-  //printf("(x1,y1)=(%lu,%lu) and (x2,y2)=(%lu,%lu) -> ",mpz_get_ui(x),mpz_get_ui(y),mpz_get_ui(x2),mpz_get_ui(y2));
   if (mpz_cmp(x,x2) == 0){
     mpz_set_ui(x,0UL);
     mpz_set_ui(y,0UL);
@@ -73,22 +71,17 @@ void point_addition(mpz_t x,mpz_t y,mpz_t x2,mpz_t y2){
 
   mpz_sub(xo,x,x2);
   mpz_sub(yo,y,y2);
-
   mpz_invert(tmp_exp,xo,n);
   mpz_mul(tmp_exp,tmp_exp,yo);  // tmp_exp = ( (y-y2) * (x-x2)⁻¹ )
   mpz_mod(tmp_exp,tmp_exp,n);
-
   mpz_set(xo,x);
   mpz_set(yo,y);
-
   mpz_mul(r,tmp_exp,tmp_exp);
   mpz_add(yo,x,x2);
   mpz_sub(x,r,yo);               // x_new = tmp_exp²-(x+x2)
   mpz_mod(x,x,n);
-
   mpz_sub(r,x2,x);
   mpz_mod(r,r,n); // spped enhancement due to calculation iwth small postive numbers
-
   mpz_mul(tmp_exp,tmp_exp,r);
   mpz_sub(tmp_exp,tmp_exp,y2);                // y_new = tmp_exp * (x-x_new) - y
   mpz_mod(y,tmp_exp,n);
@@ -117,20 +110,14 @@ void point_doubling(mpz_t x,mpz_t y){ // x=[(3x²+a)/(2y)]² - 2 x
 
 
 void scalar_multiplication(mpz_t x,mpz_t y,mpz_t k){
-
   mpz_set(Gx,x);
   mpz_set(Gy,y);
-
   char *val_str = mpz_get_str(NULL, 2, k);
-  //printf("String: %s\n",val_str);
   size_t len = strlen(val_str);
   for (int i = 1; i != len;i++)  {
-  //printf("Char: %c in round %d\n", val_str[i],i );
   point_doubling(x,y); // This leads to Doubling of point infinity in first round, which is uncritical
-  //printf("LOOP_DOU_point = (%lu,%lu) \n",mpz_get_ui(x),mpz_get_ui(y));
    if (val_str[i] == '1'){
     point_addition(x,y,Gx,Gy);
-    //printf("LOOP_ADD_point = (%lu,%lu) \n",mpz_get_ui(x),mpz_get_ui(y));
   }
   }
 }
@@ -151,31 +138,6 @@ int main()
   Evaluate_function(y,x); // y=f(x)=x
 
 	printf("point G = (%lu,%lu) \n",mpz_get_ui (x),mpz_get_ui (y));
-
-
-/*
-// Example to list
-  mpz_set(Gx,x);
-  mpz_set(Gy,y);
-  point_doubling(x,y);
-  for(int i=0;i!=20;i++){
-    point_addition(x,y,Gx,Gy);
-    printf("point %d G = (%lu,%lu) \n",i+3,mpz_get_ui(x),mpz_get_ui(y));
-  }
-*/
-
-
-
-/*
-// for manuel tests
-// z.b. right now 24=(1*2+1)*2*2*2
-  mpz_set(Gx,x);
-  mpz_set(Gy,y);
-point_doubling(x,y);point_addition(x,y,Gx,Gy);
-point_doubling(x,y);point_doubling(x,y);
-point_doubling(x,y);
-printf("point G = (%lu,%lu) \n",mpz_get_ui(x),mpz_get_ui(y));
-*/
 
 
   for(int i=2;i!=25;i++){
