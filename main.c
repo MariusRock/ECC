@@ -148,7 +148,6 @@ int main()
   printf("point %lu G = (%lu,%lu) \n",mpz_get_ui(k),mpz_get_ui(x),mpz_get_ui(y));
   }
 
-
   clear_values
 
   return 0;
